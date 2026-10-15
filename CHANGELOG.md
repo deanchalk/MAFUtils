@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.4.0 — prepared for publication
+## 0.4.0
 
 - Bulk-loaded, immutable session metadata catalogs with explicit atomic refresh.
 - Complete schema/object inventories and in-memory object details.

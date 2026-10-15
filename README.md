@@ -1,17 +1,64 @@
 # MAFUtils
 
 SQL Server metadata catalogs and dependency analysis for Microsoft Agent Framework and ordinary .NET applications.
-`MAFUtils.SqlServer` targets .NET 10. Version `0.4.0` is configured for local packing, not published to NuGet.
-`MAFUtils.Core` remains reserved for future shared utilities.
-
-For validated packages and GitHub/NuGet.org publishing setup, see [PUBLISHING.md](https://github.com/deanchalk/MAFUtils/blob/main/PUBLISHING.md).
-The release history and outstanding review findings are in [CHANGELOG.md](https://github.com/deanchalk/MAFUtils/blob/main/CHANGELOG.md).
+Use the [MAFUtils.SqlServer NuGet package](https://www.nuget.org/packages/MAFUtils.SqlServer) in .NET 10 applications
+to explore database structure, list schemas and tables, and find direct or transitive dependencies.
+It works with ordinary .NET code and exposes function tools for AI agents.
 
 The service loads database metadata into an immutable, session-scoped in-memory catalog. It builds incoming and
 outgoing dependency indexes at load time. Subsequent searches, inventories, descriptions and dependency queries
 use memory, not database round trips. Application data rows are never loaded, and model-generated SQL is never executed.
 
-## Start a session
+## Install
+
+From your .NET 10 application directory:
+
+```powershell
+dotnet add package MAFUtils.SqlServer --version 0.4.0
+```
+
+You need a SQL Server connection whose identity can read the required metadata, including database
+`VIEW DEFINITION` and `SELECT` on `sys.sql_expression_dependencies`. See
+[Captured metadata and visibility](#captured-metadata-and-visibility) for scope and permission details.
+No model provider or Agent Framework package is required for direct .NET use.
+Review the [release notes and known issues](https://github.com/deanchalk/MAFUtils/blob/main/CHANGELOG.md)
+when evaluating dependency results.
+
+## Quick start: list schemas and tables
+
+Set `SQLSERVER_CONNECTION_STRING` in your application's environment, then use:
+
+```csharp
+using MAFUtils.SqlServer;
+
+var connectionString = Environment.GetEnvironmentVariable("SQLSERVER_CONNECTION_STRING")
+    ?? throw new InvalidOperationException("Set SQLSERVER_CONNECTION_STRING first.");
+var metadata = new SqlServerMetadataService(connectionString);
+
+// One call returns every visible, permitted schema and its tables, including empty schemas.
+var inventory = await metadata.GetDatabaseInventoryAsync(kind: SqlObjectKind.Table);
+foreach (var schema in inventory.Schemas)
+{
+    var tables = schema.Objects.Count == 0
+        ? "(no visible tables)"
+        : string.Join(", ", schema.Objects.Select(table => table.Name));
+    Console.WriteLine($"{schema.Schema}: {tables}");
+}
+```
+
+Keep the service for subsequent questions; it reuses the loaded catalog. Call
+`await metadata.RefreshCatalogAsync()` when you want to capture database schema changes.
+
+## Use with Microsoft Agent Framework
+
+Add the Agent Framework package to your host application (the integration tests use version `1.24.0`):
+
+```powershell
+dotnet add package Microsoft.Agents.AI --version 1.24.0
+```
+
+Also install and configure your chosen model provider's `IChatClient` implementation. The example below
+assumes your application supplies `chatClient`, `connectionString` and `cancellationToken`.
 
 ```csharp
 using MAFUtils.SqlServer;
@@ -165,6 +212,9 @@ tool collection and update prompts to `RecommendedInstructions`. No application 
 
 ## Build, test and pack
 
+Repository contributors need the .NET 10 SDK. `MAFUtils.SqlServer` is the library and NuGet package;
+`MAFUtils.SqlServer.Tests` contains its tests, and `MAFUtils.Core` is a placeholder for future shared utilities.
+
 ```powershell
 dotnet build MAFUtils/MAFUtils.slnx -c Release
 dotnet test MAFUtils/MAFUtils.slnx -c Release
@@ -180,3 +230,11 @@ single-flight initialization, explicit refresh/failure recovery, policy enforcem
 diamond dependency graphs, intermediate views/functions, distinct counts independent of paging, literal search, unusual
 identifiers, cancellation and invocation through Agent Framework. The scripted agent tests validate plumbing and response
 contracts; they do not replace evaluations with a real model.
+
+For the full package validation script and maintainer release instructions, see
+[PUBLISHING.md](https://github.com/deanchalk/MAFUtils/blob/main/PUBLISHING.md).
+Pushing a version tag publishes that version after validation; ordinary branch pushes do not publish.
+
+## License
+
+MAFUtils is distributed under the [MIT license](https://github.com/deanchalk/MAFUtils/blob/main/LICENSE).

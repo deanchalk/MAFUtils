@@ -92,7 +92,15 @@ version tag can enter the publish job. Invalid version tags fail validation. Dup
 versions fail instead of silently accepting a different existing package.
 
 NuGet ingestion/indexing is asynchronous: a successful push does not mean the
-version is immediately searchable. Check the package's NuGet.org status afterward.
+version is immediately searchable. In NuGet.org, select your username → Manage
+packages and check the unpublished/unlisted section for its validation status.
+NuGet sends an email when validation completes or fails. Processing usually takes
+less than 15 minutes; see [NuGet validation and indexing](https://learn.microsoft.com/en-us/nuget/nuget-org/publish-a-package#package-validation-and-indexing).
+
+The root README.md is also embedded in the NuGet package. Repository documentation
+edits appear on GitHub when pushed, but the README inside an existing package does
+not change. Include documentation updates in the next version tag to ship them
+with the package; do not reuse an existing version.
 
 ## Optional manual publication
 
