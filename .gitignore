@@ -426,3 +426,6 @@ FodyWeavers.xsd
 
 # Official VS Code C# Dev Kit Extension exclusion
 #*.lscache
+
+# Machine-specific SQL test connection settings (may contain credentials).
+MAFUtils/local.runsettings

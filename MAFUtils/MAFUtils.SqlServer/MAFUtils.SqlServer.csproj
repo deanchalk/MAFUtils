@@ -1,0 +1,42 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <Description>Session-scoped SQL Server metadata catalogs and dependency graph tools for Microsoft Agent Framework and .NET applications.</Description>
+    <Version>0.4.0</Version>
+    <IsPackable>true</IsPackable>
+    <PackageId>MAFUtils.SqlServer</PackageId>
+    <Authors>Dean Chalk</Authors>
+    <Copyright>Copyright (c) 2026 Dean Chalk</Copyright>
+    <PackageProjectUrl>https://github.com/deanchalk/MAFUtils</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/deanchalk/MAFUtils</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <!-- Existing public APIs are not yet fully documented. Ship available XML documentation. -->
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+    <DebugType>portable</DebugType>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <PackageReleaseNotes>Session-scoped metadata snapshots and dependency graph queries. See CHANGELOG.md in the repository for compatibility notes and known issues.</PackageReleaseNotes>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageTags>MicrosoftAgentFramework;AI;SqlServer;Tools</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.SqlClient" Version="7.1.1" />
+    <PackageReference Include="Microsoft.Extensions.AI" Version="10.10.0" />
+    <!-- Override SqlClient's transitive version for the October 2026 security fixes. -->
+    <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.13" />
+    <None Include="../../README.md" Pack="true" PackagePath="/" />
+    <None Include="../../LICENSE" Pack="true" PackagePath="/" />
+    <None Include="../../CHANGELOG.md" Pack="true" PackagePath="/" />
+    <None Include="../../PUBLISHING.md" Pack="true" PackagePath="/" />
+  </ItemGroup>
+
+</Project>

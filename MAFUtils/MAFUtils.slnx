@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/Solution Items/">
+    <File Path="local.runsettings" />
+  </Folder>
+  <Project Path="MAFUtils.Core/MAFUtils.Core.csproj" />
+  <Project Path="MAFUtils.SqlServer.Tests/MAFUtils.SqlServer.Tests.csproj" />
+  <Project Path="MAFUtils.SqlServer/MAFUtils.SqlServer.csproj" />
+</Solution>

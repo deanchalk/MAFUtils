@@ -1,0 +1,88 @@
+name: NuGet
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Optional package version override, e.g. 0.4.0-rc.1; blank uses the project version'
+        type: string
+        required: false
+      publish:
+        description: 'Publish the validated package to NuGet.org (main branch only)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: windows-2022
+    timeout-minutes: 20
+    env:
+      MAFUTILS_TEST_SQLSERVER: 'Server=(localdb)\MSSQLLocalDB;Integrated Security=true;Encrypt=true;TrustServerCertificate=true'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Start SQL Server LocalDB
+        shell: pwsh
+        run: |
+          sqllocaldb start MSSQLLocalDB
+          if ($LASTEXITCODE -ne 0) { throw 'SQL Server LocalDB failed to start.' }
+      - name: Test, pack, inspect and consume package
+        shell: pwsh
+        env:
+          REQUESTED_VERSION: ${{ inputs.version }}
+        run: ./scripts/Build-Package.ps1 -Version $env:REQUESTED_VERSION
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nuget-packages
+          path: |
+            artifacts/nuget/**/*.nupkg
+            artifacts/nuget/**/*.snupkg
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: artifacts/validation/**/*.trx
+          if-no-files-found: ignore
+
+  publish:
+    if: github.event_name == 'workflow_dispatch' && inputs.publish && github.ref == 'refs/heads/main'
+    needs: validate
+    runs-on: ubuntu-latest
+    environment: nuget
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - uses: actions/download-artifact@v4
+        with:
+          name: nuget-packages
+          path: packages
+      - name: Get short-lived NuGet publishing credentials
+        uses: NuGet/login@v1
+        id: login
+        with:
+          user: ${{ secrets.NUGET_USER }}
+      - name: Publish the validated package and symbols
+        shell: pwsh
+        env:
+          NUGET_API_KEY: ${{ steps.login.outputs.NUGET_API_KEY }}
+        run: |
+          $packages = @(Get-ChildItem packages -Recurse -Filter '*.nupkg')
+          if ($packages.Count -ne 1) { throw 'Expected exactly one validated NuGet package.' }
+          # dotnet push also submits the adjacent .snupkg. Duplicate versions fail deliberately.
+          dotnet nuget push $packages[0].FullName --api-key $env:NUGET_API_KEY --source https://api.nuget.org/v3/index.json
+          if ($LASTEXITCODE -ne 0) { throw 'NuGet publication failed.' }
