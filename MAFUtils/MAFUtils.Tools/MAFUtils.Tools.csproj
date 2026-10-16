@@ -1,0 +1,33 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <Description>Offline inspection of names, descriptions and input schemas for Microsoft.Extensions.AI function tools.</Description>
+    <Version>0.1.0</Version>
+    <IsPackable>true</IsPackable>
+    <PackageId>MAFUtils.Tools</PackageId>
+    <Authors>Dean Chalk</Authors>
+    <Copyright>Copyright (c) 2026 Dean Chalk</Copyright>
+    <PackageProjectUrl>https://github.com/deanchalk/MAFUtils/blob/main/MAFUtils/MAFUtils.Tools/README.md</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/deanchalk/MAFUtils</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
+    <DebugType>portable</DebugType>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageTags>MicrosoftAgentFramework;AI;Tools;Inspection</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.AI.Abstractions" Version="10.10.0" />
+    <None Update="README.md" Pack="true" PackagePath="/" />
+  </ItemGroup>
+
+</Project>

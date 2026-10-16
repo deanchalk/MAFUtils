@@ -10,7 +10,7 @@
     <PackageId>MAFUtils.SqlServer</PackageId>
     <Authors>Dean Chalk</Authors>
     <Copyright>Copyright (c) 2026 Dean Chalk</Copyright>
-    <PackageProjectUrl>https://github.com/deanchalk/MAFUtils</PackageProjectUrl>
+    <PackageProjectUrl>https://github.com/deanchalk/MAFUtils/blob/main/MAFUtils/MAFUtils.SqlServer/README.md</PackageProjectUrl>
     <RepositoryUrl>https://github.com/deanchalk/MAFUtils</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
@@ -33,10 +33,7 @@
     <PackageReference Include="Microsoft.Extensions.AI" Version="10.10.0" />
     <!-- Override SqlClient's transitive version for the October 2026 security fixes. -->
     <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.13" />
-    <None Include="../../README.md" Pack="true" PackagePath="/" />
-    <None Include="../../LICENSE" Pack="true" PackagePath="/" />
-    <None Include="../../CHANGELOG.md" Pack="true" PackagePath="/" />
-    <None Include="../../PUBLISHING.md" Pack="true" PackagePath="/" />
+    <None Update="README.md" Pack="true" PackagePath="/" />
   </ItemGroup>
 
 </Project>

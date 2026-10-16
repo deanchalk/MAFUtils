@@ -1,117 +1,101 @@
-# Publishing MAFUtils.SqlServer
+# Publishing MAFUtils packages
 
-The publishable package is **MAFUtils.SqlServer**, targeting **.NET 10**.
-The placeholder Core project and test project are not packable.
-Pushing a version tag such as v0.4.0 automatically validates and publishes that
-version. Branch pushes, pull requests and manual validation runs do not publish.
+A pushed version tag releases **MAFUtils.SqlServer** and **MAFUtils.Tools** together, using the tag's version for
+both packages. They remain independently installable NuGet packages. Core and the test projects are not packaged.
+For example, `v0.5.0` produces version `0.5.0` of both libraries; `v0.5.0-rc.1` produces two prerelease packages.
+Branch pushes, pull requests and manual workflow runs validate only; they do not publish.
 
 ## Build and validate locally
 
-Install a .NET 10 SDK and PowerShell 7. Configure the SQL test connection using
-MAFUTILS_TEST_SQLSERVER or the ignored MAFUtils/local.runsettings file.
-Tests create/drop their own GUID-named database; use a test-server identity with
-CREATE DATABASE permission. For example:
+Use the .NET 10 SDK and PowerShell 7. Configure `MAFUTILS_TEST_SQLSERVER` or the ignored
+`MAFUtils/local.runsettings` for a dedicated SQL test server. Tests create and drop GUID-named databases and require
+permission to do so. With LocalDB installed and started:
 
-~~~powershell
+```powershell
 $env:MAFUTILS_TEST_SQLSERVER = 'Server=(localdb)\MSSQLLocalDB;Integrated Security=true;Encrypt=true;TrustServerCertificate=true'
-./scripts/Build-Package.ps1
-# Optional prerelease build without editing the project's default version:
-./scripts/Build-Package.ps1 -Version 0.4.0-rc.1
-~~~
+./scripts/Build-Package.ps1 -Version 0.5.0-rc.1
+```
 
-The script restores, builds, runs all tests, rejects skipped tests, packs, checks
-package metadata/content and portable symbols, and compiles/runs a separate
-consumer against the generated package using an isolated package cache.
-Output is in artifacts/nuget/VERSION:
+The script restores/builds the solution, runs each package's test project into a separate results directory, and
+requires all tests to pass without skips. It then builds both packages and symbol packages, checks their identities,
+versions, MIT license expressions, README contents and website/repository links, and runs a separate consumer of
+each actual NuGet package. Consumers use separate fresh package caches and cannot resolve MAFUtils packages from
+nuget.org. The SQL consumer never connects to a database; the Tools consumer verifies inspection without invocation.
 
-- MAFUtils.SqlServer.VERSION.nupkg
-- MAFUtils.SqlServer.VERSION.snupkg
+Each run creates `artifacts/nuget/<run-id>` containing:
 
-The package contains the assembly, available XML documentation, README, MIT
-license and changelog. Symbols use portable PDBs and the SDK's Source Link support;
-repository commit metadata is supplied by the Git checkout. Commit the release
-sources before making the distributable release build. Local settings and test
-fixtures are not package content. Build output and local.runsettings are ignored.
+- `MAFUtils.SqlServer.VERSION.nupkg` and `.snupkg`.
+- `MAFUtils.Tools.VERSION.nupkg` and `.snupkg`.
 
-The default local/branch-build version is in MAFUtils/MAFUtils.SqlServer/MAFUtils.SqlServer.csproj.
-For a tagged release, the tag supplies the package version (v0.4.1 produces 0.4.1),
-overriding the project default for both the build and package.
-Use a new version for every publication; NuGet package versions cannot be replaced.
-Review CHANGELOG.md, including the outstanding correctness issues from the code
-review, before choosing a production release.
+Test results and consumer projects go to `artifacts/validation/<run-id>`. Unique output directories prevent old
+packages from entering a new release artifact. The script prints the validated output directory and, in Actions,
+exposes it as the step's `package-directory` output. Only that directory is uploaded for publication.
 
-## Configure GitHub and NuGet.org once
+With `-Version`, both packages use that version. Without it, local and ordinary branch builds use each project's
+own `<Version>` value. Tag builds always supply the tag version, overriding both project defaults. Commit the
+intended release sources before creating the release tag so source metadata refers to that revision.
 
-The workflow uses [NuGet Trusted Publishing](https://learn.microsoft.com/en-us/nuget/nuget-org/trusted-publishing),
-which obtains a short-lived API key using GitHub OIDC. It does not require a
-stored long-lived NuGet API key.
+Packages contain their own project README, library DLL and XML documentation; MIT is declared in metadata.
+Portable PDBs are supplied in symbol packages. Root documentation, local settings and test fixtures are not shipped.
 
-1. Commit and push the library, tests, scripts and .github/workflows/nuget.yml to
-   deanchalk/MAFUtils. The workflow must exist on main for manual dispatch.
-2. Sign in to the NuGet.org account that will own the package. Verify the
-   MAFUtils.SqlServer ID is available or that this account has publishing rights.
-3. Create a GitHub environment named **nuget** under repository Settings →
-   Environments. Under Deployment branches and tags, select Selected branches and
-   tags and add a **Tag** rule matching **v***. Remove a previous main-only rule if
-   it prevents tag deployments. Leave required reviewers and wait timers disabled
-   if releases should proceed without any manual approval.
-4. Add environment secret **NUGET_USER** containing the NuGet.org profile username,
-   not an email address or API key.
-5. In NuGet.org Trusted Publishing, add a policy with:
-   - Repository owner: deanchalk
-   - Repository: MAFUtils
-   - Workflow file: nuget.yml (filename only)
-   - Environment: nuget
-   - Package scope: MAFUtils.SqlServer
-   - Allow creation of a new package for the first publication, and new versions
-     for subsequent publications.
+## Configure GitHub and NuGet.org
 
-The account/environment configuration is not performed by repository files.
+The workflow uses [NuGet Trusted Publishing](https://learn.microsoft.com/en-us/nuget/nuget-org/trusted-publishing)
+to obtain a short-lived publishing key using GitHub OIDC.
 
-## Publish
+1. Ensure `.github/workflows/nuget.yml` and the validation script are committed to `deanchalk/MAFUtils`.
+2. In the GitHub repository, keep the **nuget** environment and permit deployment from tags matching **v***.
+3. Set the environment secret **NUGET_USER** to **dchalk**, the NuGet.org profile username, not an email address or API key.
+4. In that NuGet.org account's **Trusted Publishing** settings, configure the policy for:
+   - Repository owner: `deanchalk`.
+   - Repository: `MAFUtils`.
+   - Workflow file: `nuget.yml` (filename only).
+   - Environment: `nuget`.
+   - Package scope covering **both** `MAFUtils.SqlServer` and `MAFUtils.Tools`. The glob `MAFUtils.*` covers both
+     and future packages under that prefix; choose it only if that broader scope is intended.
+   - Permission to create new packages for the first Tools publication, and to publish new versions.
+5. Confirm `dchalk` has publishing rights for the existing package and that the Tools package ID is available
+   or already owned by the appropriate account.
 
-After committing and pushing the workflow changes, tag the commit you want to
-release and push that specific tag. For example, from the intended release commit:
+A policy restricted to `MAFUtils.SqlServer` will not authorize Tools. Account policies are configured on nuget.org,
+not by committing repository files. The username change does not change the GitHub repository owner `deanchalk`.
 
-~~~powershell
-git tag v0.4.0
-git push origin v0.4.0
-~~~
+## Publish a shared version
 
-This publishes version 0.4.0 automatically after validation succeeds. Use
-v0.4.1 for the next version, or v0.4.1-rc.1 for a prerelease. The tag must point
-to a commit containing this version-tag workflow. Creating a tag locally without
-pushing it does not start a GitHub run. Do not move or reuse published version tags.
+Choose a version unused for both package IDs, commit and push the intended source changes, then tag that commit:
 
-GitHub Actions → NuGet → Run workflow remains available for validation only.
+```powershell
+git tag v0.5.0
+git push origin v0.5.0
+```
 
-The Windows validation job starts LocalDB, runs the same package script, and
-uploads the validated package/symbol pair. The publish job downloads those exact
-artifacts, obtains the OIDC credential, then pushes to NuGet.org. Only a push of a
-version tag can enter the publish job. Invalid version tags fail validation. Duplicate
-versions fail instead of silently accepting a different existing package.
+The version above is an example, not a claim that it is currently available. Tags must have the form `vMAJOR.MINOR.PATCH`
+with an optional prerelease suffix, such as `v0.5.0-rc.1`. Push the specific tag; a local tag does not start GitHub Actions.
+Never move or reuse a release tag to publish different contents.
 
-NuGet ingestion/indexing is asynchronous: a successful push does not mean the
-version is immediately searchable. In NuGet.org, select your username → Manage
-packages and check the unpublished/unlisted section for its validation status.
-NuGet sends an email when validation completes or fails. Processing usually takes
-less than 15 minutes; see [NuGet validation and indexing](https://learn.microsoft.com/en-us/nuget/nuget-org/publish-a-package#package-validation-and-indexing).
+The Windows validation job starts LocalDB and validates both packages before either can be published. The publish
+job downloads only those artifacts, verifies that exactly the two expected packages and their symbols match the
+tag version, obtains the OIDC key, and pushes each package with its adjacent symbols. Both use the same version,
+even when only one library changed. No changes to the project default versions are required for a tagged release.
 
-The root README.md is also embedded in the NuGet package. Repository documentation
-edits appear on GitHub when pushed, but the README inside an existing package does
-not change. Include documentation updates in the next version tag to ship them
-with the package; do not reuse an existing version.
+Publication of two packages is **not atomic**. One may succeed before the second fails. The push uses `--skip-duplicate`
+so rerunning the failed publish job with the same validated artifacts can finish the release without replacing an
+existing package version. This flag does not compare existing package contents: always use a new version for a new
+release, and retry only the original immutable tag/artifacts. If a symbol upload fails, check its status separately.
+
+GitHub Actions → NuGet → Run workflow remains validation-only, including when a version override is supplied.
+A successful push can precede NuGet indexing; check each package's status in your NuGet account. Each package's
+embedded README changes only when a new version containing it is published.
 
 ## Optional manual publication
 
-If you prefer a scoped NuGet.org API key instead of GitHub Trusted Publishing,
-provide it as NUGET_API_KEY in your local shell, then run the following only when
-you intend to publish the already validated package:
+For recovery using already validated artifacts, supply a suitably scoped `NUGET_API_KEY` in your shell and use
+explicit package paths from the validated output directory:
 
-~~~powershell
-dotnet nuget push ./artifacts/nuget/0.4.0/MAFUtils.SqlServer.0.4.0.nupkg --api-key $env:NUGET_API_KEY --source https://api.nuget.org/v3/index.json
-~~~
+```powershell
+dotnet nuget push ./artifacts/nuget/RUN-ID/MAFUtils.SqlServer.0.5.0.nupkg --api-key $env:NUGET_API_KEY --source https://api.nuget.org/v3/index.json --skip-duplicate
+dotnet nuget push ./artifacts/nuget/RUN-ID/MAFUtils.Tools.0.5.0.nupkg --api-key $env:NUGET_API_KEY --source https://api.nuget.org/v3/index.json --skip-duplicate
+```
 
-Keep the matching .snupkg beside the .nupkg; dotnet push also submits the symbols.
-Never put credentials in source files, runsettings committed to Git, or command
-examples containing literal keys.
+Keep each matching `.snupkg` beside its `.nupkg`; the push also submits symbols. Never commit credentials or put
+literal API keys into documentation. Review [CHANGELOG.md](CHANGELOG.md) and package limitations before a release.

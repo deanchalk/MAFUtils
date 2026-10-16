@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Optional package version override, e.g. 0.4.0-rc.1; blank uses the project version'
+        description: 'Optional version for both packages, e.g. 0.5.0-rc.1; blank uses each project version'
         type: string
         required: false
 
@@ -33,7 +33,8 @@ jobs:
         run: |
           sqllocaldb start MSSQLLocalDB
           if ($LASTEXITCODE -ne 0) { throw 'SQL Server LocalDB failed to start.' }
-      - name: Test, pack, inspect and consume package
+      - name: Test, pack, inspect and consume both packages
+        id: packages
         shell: pwsh
         env:
           REQUESTED_VERSION: ${{ inputs.version }}
@@ -50,8 +51,8 @@ jobs:
         with:
           name: nuget-packages
           path: |
-            artifacts/nuget/**/*.nupkg
-            artifacts/nuget/**/*.snupkg
+            ${{ steps.packages.outputs.package-directory }}/*.nupkg
+            ${{ steps.packages.outputs.package-directory }}/*.snupkg
           if-no-files-found: error
       - uses: actions/upload-artifact@v4
         if: always()
@@ -81,13 +82,25 @@ jobs:
         id: login
         with:
           user: ${{ secrets.NUGET_USER }}
-      - name: Publish the validated package and symbols
+      - name: Publish both validated packages and symbols
         shell: pwsh
         env:
           NUGET_API_KEY: ${{ steps.login.outputs.NUGET_API_KEY }}
         run: |
+          $version = $env:GITHUB_REF_NAME.Substring(1)
           $packages = @(Get-ChildItem packages -Recurse -Filter '*.nupkg')
-          if ($packages.Count -ne 1) { throw 'Expected exactly one validated NuGet package.' }
-          # dotnet push also submits the adjacent .snupkg. Duplicate versions fail deliberately.
-          dotnet nuget push $packages[0].FullName --api-key $env:NUGET_API_KEY --source https://api.nuget.org/v3/index.json
-          if ($LASTEXITCODE -ne 0) { throw 'NuGet publication failed.' }
+          $symbols = @(Get-ChildItem packages -Recurse -Filter '*.snupkg')
+          if ($packages.Count -ne 2 -or $symbols.Count -ne 2) { throw 'Expected exactly two validated packages and symbol packages.' }
+          $release = foreach ($id in @('MAFUtils.SqlServer', 'MAFUtils.Tools')) {
+            $match = @($packages | Where-Object Name -CEQ "$id.$version.nupkg")
+            if ($match.Count -ne 1) { throw "Missing or mismatched package: $id $version" }
+            if (-not (Test-Path -LiteralPath (Join-Path $match[0].DirectoryName "$id.$version.snupkg"))) {
+              throw "Missing symbols: $id $version"
+            }
+            $match[0]
+          }
+          # A rerun can finish a partially successful release without replacing published versions.
+          foreach ($package in $release) {
+            dotnet nuget push $package.FullName --api-key $env:NUGET_API_KEY --source https://api.nuget.org/v3/index.json --skip-duplicate
+            if ($LASTEXITCODE -ne 0) { throw "NuGet publication failed for $($package.Name)." }
+          }
