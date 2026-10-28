@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <Description>Keeps oversized Microsoft.Extensions.AI tool results out of the model context: stores them in a session store and returns a bounded preview with read and search tools.</Description>
+    <Version>0.7.0</Version>
+    <IsPackable>true</IsPackable>
+    <PackageId>MAFUtils.ToolResults</PackageId>
+    <Authors>Dean Chalk</Authors>
+    <Copyright>Copyright (c) 2026 Dean Chalk</Copyright>
+    <PackageProjectUrl>https://github.com/deanchalk/MAFUtils/blob/main/MAFUtils/MAFUtils.ToolResults/README.md</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/deanchalk/MAFUtils</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
+    <DebugType>portable</DebugType>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageTags>MicrosoftAgentFramework;AI;Tools;Context</PackageTags>
+    <PackageReleaseNotes>First release. See CHANGELOG.md in the repository.</PackageReleaseNotes>
+    <IsAotCompatible>true</IsAotCompatible>
+    <!-- No published baseline yet; set PackageValidationBaselineVersion after the first release. -->
+    <EnablePackageValidation>true</EnablePackageValidation>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.AI.Abstractions" Version="10.11.0" />
+    <None Update="README.md" Pack="true" PackagePath="/" />
+  </ItemGroup>
+
+</Project>

@@ -2,5 +2,7 @@
   <Project Path="MAFUtils.SqlServer.Tests/MAFUtils.SqlServer.Tests.csproj" />
   <Project Path="MAFUtils.SqlServer/MAFUtils.SqlServer.csproj" />
   <Project Path="MAFUtils.Tools/MAFUtils.Tools.csproj" Id="1913f561-aecb-4462-862e-fb354401a342" />
+  <Project Path="MAFUtils.ToolResults.Tests/MAFUtils.ToolResults.Tests.csproj" />
+  <Project Path="MAFUtils.ToolResults/MAFUtils.ToolResults.csproj" />
   <Project Path="MAFUtils.Tools.Tests/MAFUtils.Tools.Tests.csproj" />
 </Solution>

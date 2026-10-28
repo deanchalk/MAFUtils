@@ -10,11 +10,12 @@ use the individual package guides below; they require no knowledge of this repos
 | --- | --- | --- |
 | `MAFUtils.SqlServer` | Session-scoped SQL Server metadata catalogs, schema discovery and dependency analysis. | [SQL Server package README](MAFUtils/MAFUtils.SqlServer/README.md) |
 | `MAFUtils.Tools` | Offline inspection of tool names, descriptions and input schemas. | [Tools package README](MAFUtils/MAFUtils.Tools/README.md) |
+| `MAFUtils.ToolResults` | Stores oversized tool results and gives the model a preview plus search and read tools. | [ToolResults package README](MAFUtils/MAFUtils.ToolResults/README.md) |
 
 Each project folder contains the README for consumers of that project's NuGet package, including installation,
 quick-start examples, configuration and limitations. Each package's NuGet website/project link points directly to
-its README; its repository link points to the source repository. Library dependencies do not connect the two packages.
-Pushing a release tag publishes both packages with the same tagged version after validation succeeds.
+its README; its repository link points to the source repository. Library dependencies do not connect the packages.
+Pushing a release tag publishes every package with the same tagged version after validation succeeds.
 
 ## Repository layout
 
@@ -22,9 +23,11 @@ Pushing a release tag publishes both packages with the same tagged version after
 - `MAFUtils/MAFUtils.SqlServer.Tests`: SQL Server unit and integration tests.
 - `MAFUtils/MAFUtils.Tools`: contract inspection library and package documentation.
 - `MAFUtils/MAFUtils.Tools.Tests`: offline inspector tests and SQL tool contract consumer tests.
+- `MAFUtils/MAFUtils.ToolResults`: oversized tool result storage library and package documentation.
+- `MAFUtils/MAFUtils.ToolResults.Tests`: offline store, tool and scripted Agent Framework tests.
 - `MAFUtils/MAFUtils.slnx`: solution containing the libraries and tests.
-- `scripts/Build-Package.ps1`: release validation and separate consumer smoke tests for both packages.
-- `.github/workflows/nuget.yml`: Windows validation and tag-triggered publication of both packages.
+- `scripts/Build-Package.ps1`: release validation and separate consumer smoke tests for every package.
+- `.github/workflows/nuget.yml`: Windows validation and tag-triggered publication of every package.
 - `.github/dependabot.yml`: monthly updates for the commit-SHA-pinned GitHub Actions.
 - `global.json`: SDK selection, starting at .NET SDK 10.0.100 and rolling forward to the latest installed feature band.
 - `artifacts`: local package and validation output; generated files are not source.
@@ -49,21 +52,29 @@ schema positions; annotation payloads remain data. Numeric thresholds and budget
 limits. Unsupported constructs and exhausted configured budgets mark partial analysis. Traversal and diagnostic path
 formatting are iterative so unrestricted depth does not consume the call stack.
 
-The Tools test project references both libraries to check real function contracts offline. This is a test dependency,
+`MAFUtils.ToolResults` separates the session store (`ToolResultStore`: sliding expiry, least-recently-used eviction
+and capacity limits behind one lock), the function wrapper (`ToolResultLimits`, a private `DelegatingAIFunction` that
+classifies, measures and stores results), immutable stored text with a line index (`StoredText`), and the companion tools
+(`StoredResultTools`). It references only `Microsoft.Extensions.AI.Abstractions` directly. Wrapping must not change a
+tool's name, description or input schema, and must leave exceptions, cancellation and non-text content untouched.
+Companion tools are marked internally so they are never wrapped themselves.
+
+The Tools test project references the SqlServer and Tools libraries to check real function contracts offline. This is a test dependency,
 not a dependency between the distributed packages. Add a shared library only when independently useful packages
 actually need common abstractions.
 
-Both libraries set `IsAotCompatible` and must not rely on reflection-based System.Text.Json. `SqlServerDiscoveryTools`
-appends a source-generated context (`SqlServerJsonContext`) after the Microsoft.Extensions.AI default resolver: add
-every new tool parameter or result type to that context. Both projects enable package validation against the
-published 0.5.1 baseline; update `PackageValidationBaselineVersion` after each release.
+All libraries set `IsAotCompatible` and must not rely on reflection-based System.Text.Json. `SqlServerDiscoveryTools`
+and `StoredResultTools` append a source-generated context (`SqlServerJsonContext`, `ToolResultsJsonContext`) after the
+Microsoft.Extensions.AI default resolver: add every new tool parameter or result type to the matching context.
+SqlServer and Tools enable package validation against the published 0.6.0 baseline; update
+`PackageValidationBaselineVersion` after each release, and add it to ToolResults after its first release.
 
 ## Development prerequisites
 
 Use a .NET 10 SDK compatible with `global.json` and an IDE that supports the target framework and `.slnx` solution
 format, or use the CLI. Package restore requires access to the configured NuGet feeds. The validation script also
 requires PowerShell 7. SQL integration tests need a reachable SQL Server instance; the CI workflow uses Windows LocalDB.
-Neither library's tests require a live model provider.
+No library's tests require a live model provider.
 
 ## Build and test
 
@@ -75,14 +86,15 @@ dotnet build MAFUtils/MAFUtils.slnx -c Release
 dotnet test MAFUtils/MAFUtils.slnx -c Release
 ```
 
-To run the Tools tests independently:
+To run the Tools or ToolResults tests independently:
 
 ```powershell
 dotnet test MAFUtils/MAFUtils.Tools.Tests/MAFUtils.Tools.Tests.csproj -c Release
+dotnet test MAFUtils/MAFUtils.ToolResults.Tests/MAFUtils.ToolResults.Tests.csproj -c Release
 ```
 
-The Tools tests run offline without provider credentials or a SQL Server instance. They inspect the existing
-SQL Server function contracts without opening a database connection.
+The Tools and ToolResults tests run offline without provider credentials or a SQL Server instance. The Tools tests
+inspect the existing SQL Server function contracts without opening a database connection.
 
 To run the SQL Server unit tests without its database integration fixtures:
 
@@ -109,6 +121,9 @@ skipped SQL tests is not evidence that the database integration paths were valid
 SQL test coverage includes metadata visibility, complete inventories, cached details, explicit refresh, policy
 filters, dependency traversal and invocation through a scripted Agent Framework client. Tools test coverage includes
 contract rules, schema shapes, analysis budgets, safe reports, deterministic ordering and concurrent inspection.
+ToolResults test coverage includes result classification, size boundaries, expiry and eviction, read and search
+paging, surrogate-safe splitting, approval preservation and a scripted Agent Framework run that searches and reads
+a stored result.
 
 ## Package builds
 
@@ -117,9 +132,10 @@ Build each package independently:
 ```powershell
 dotnet pack MAFUtils/MAFUtils.SqlServer/MAFUtils.SqlServer.csproj -c Release -o artifacts
 dotnet pack MAFUtils/MAFUtils.Tools/MAFUtils.Tools.csproj -c Release -o artifacts
+dotnet pack MAFUtils/MAFUtils.ToolResults/MAFUtils.ToolResults.csproj -c Release -o artifacts
 ```
 
-These commands create local packages; they do not publish them. For full release validation of both packages, run
+These commands create local packages; they do not publish them. For full release validation of every package, run
 `./scripts/Build-Package.ps1 -Version 0.5.0-rc.1` with the SQL integration test connection configured. Omitting the version
 uses each project's own default version. See [CHANGELOG.md](CHANGELOG.md) for release notes and
 [PUBLISHING.md](PUBLISHING.md) for the shared tag-release process and account setup.
@@ -127,19 +143,19 @@ uses each project's own default version. See [CHANGELOG.md](CHANGELOG.md) for re
 ## CI and release validation
 
 The current NuGet workflow runs on main-branch pushes, pull requests, manual dispatch and `v*` tags. Validation
-starts LocalDB and calls `scripts/Build-Package.ps1`, which builds the solution, runs both test projects with separate
-TRX results, rejects skips/failures, packs both libraries and symbols (validating their public API against the
+starts LocalDB and calls `scripts/Build-Package.ps1`, which builds the solution, runs each test project with separate
+TRX results, rejects skips/failures, packs every library and symbols (validating their public API against the
 baseline release), checks package metadata and project README contents, and runs each package in a separate fresh
 consumer/cache with reflection-based JSON disabled. Publishing runs only for matching pushed version tags,
 after validation, using the configured NuGet environment and trusted publishing credentials. Ordinary package builds
 and branch validation do not publish.
 
-For example, pushing `v0.5.0` supplies version `0.5.0` to both libraries, regardless of their project defaults.
+For example, pushing `v0.5.0` supplies version `0.5.0` to every library, regardless of its project default.
 Each validation run has an isolated `artifacts/nuget/<run-id>` directory; only its validated files are uploaded.
-The publish job checks the two expected package names, versions and symbol packages before pushing either one.
+The publish job checks the expected package names, versions and symbol packages before pushing any of them.
 NuGet publication is not atomic across packages. Duplicate skipping supports retrying the same validated release
-if one push succeeds and the other fails; use a new version for different contents and never move a release tag.
-The NuGet trusted-publishing policy must authorize both package IDs, including first publication of Tools.
+if one push succeeds and another fails; use a new version for different contents and never move a release tag.
+The NuGet trusted-publishing policy must authorize every package ID, including first publication of ToolResults.
 See [PUBLISHING.md](PUBLISHING.md) for setup and recovery details.
 
 ## Making changes and adding packages

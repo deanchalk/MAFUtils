@@ -6,7 +6,7 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $root = Split-Path $PSScriptRoot -Parent
 $solution = Join-Path $root 'MAFUtils/MAFUtils.slnx'
-$ids = @('MAFUtils.SqlServer', 'MAFUtils.Tools')
+$ids = @('MAFUtils.SqlServer', 'MAFUtils.Tools', 'MAFUtils.ToolResults')
 if ($Version -and $Version -cnotmatch '^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$') {
     throw 'Version must be major.minor.patch with an optional prerelease suffix, e.g. 0.5.0-rc.1.'
 }
@@ -81,7 +81,26 @@ try {
   <ItemGroup><PackageReference Include="$id" Version="[$packageVersion]" /></ItemGroup>
 </Project>
 "@ | Set-Content -LiteralPath (Join-Path $consumer 'Consumer.csproj')
-        $program = if ($id -eq 'MAFUtils.SqlServer') {
+        $program = if ($id -eq 'MAFUtils.ToolResults') {
+            @'
+using System.Text.Json;
+using MAFUtils.ToolResults;
+using Microsoft.Extensions.AI;
+var store = new ToolResultStore();
+var big = AIFunctionFactory.Create(() => string.Join("\n", Enumerable.Range(0, 2000).Select(i => $"line {i}")), "Big", "Returns a large text.");
+// Stores an oversized result, then searches and reads it back through the companion tools.
+var reference = (JsonElement)(await big.WithResultLimits(store).InvokeAsync())!;
+var handle = reference.GetProperty("resultHandle").GetString();
+var tools = StoredResultTools.Create(store);
+var search = (JsonElement)(await tools.Single(t => t.Name == "SearchStoredResult").InvokeAsync(new() { ["resultHandle"] = handle, ["text"] = "line 1999" }))!;
+var read = (JsonElement)(await tools.Single(t => t.Name == "ReadStoredResult").InvokeAsync(new() { ["resultHandle"] = handle, ["offset"] = -1 }))!;
+if (search.GetProperty("data").GetProperty("totalMatches").GetInt32() != 1 || read.GetProperty("data").GetProperty("text").GetString() != "line 1999")
+    throw new InvalidOperationException("Stored result tools failed.");
+if (!store.TryGetResult(handle!, out var stored) || !stored.Text.EndsWith("line 1999"))
+    throw new InvalidOperationException("Host read failed.");
+Console.WriteLine("Tool results package consumer passed.");
+'@
+        } elseif ($id -eq 'MAFUtils.SqlServer') {
             @'
 using MAFUtils.SqlServer;
 using Microsoft.Extensions.AI;

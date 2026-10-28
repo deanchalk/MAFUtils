@@ -1,6 +1,23 @@
 # Changelog
 
-Both packages are released together with the same version from a single tag.
+All packages are released together with the same version from a single tag.
+
+## 0.7.0
+
+### MAFUtils.SqlServer and MAFUtils.Tools
+
+- No changes since 0.6.0. Released at 0.7.0 because all packages share one version. Package validation now uses
+  the published 0.6.0 baseline.
+
+### MAFUtils.ToolResults
+
+- First release: keeps oversized tool results out of the model context. `WithResultLimits` wraps existing tools;
+  results over `MaxInlineCharacters` (default 10,000) are stored in a session `ToolResultStore` and replaced by a
+  bounded preview, a shape sketch and a handle. `StoredResultTools.Create` adds `SearchStoredResult` (literal,
+  case-insensitive) and `ReadStoredResult` (line ranges, negative offsets read from the end).
+- Stores use sliding expiry, least-recently-used eviction and per-result and total character limits.
+- `ToolResultStore.TryGetResult` lets the host read the exact stored text without extending its lifetime.
+- Tool names, descriptions and input schemas are unchanged; approval-required tools still require approval.
 
 ## 0.6.0
 

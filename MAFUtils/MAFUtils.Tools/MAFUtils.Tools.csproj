@@ -6,7 +6,7 @@
     <Nullable>enable</Nullable>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <Description>Offline inspection of names, descriptions and input schemas for Microsoft.Extensions.AI function tools.</Description>
-    <Version>0.6.0</Version>
+    <Version>0.7.0</Version>
     <IsPackable>true</IsPackable>
     <PackageId>MAFUtils.Tools</PackageId>
     <Authors>Dean Chalk</Authors>
@@ -23,11 +23,11 @@
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageTags>MicrosoftAgentFramework;AI;Tools;Inspection</PackageTags>
-    <PackageReleaseNotes>ToText no longer requires reflection-based JSON and keeps non-ASCII names readable. See CHANGELOG.md in the repository.</PackageReleaseNotes>
+    <PackageReleaseNotes>No changes since 0.6.0; released alongside the new MAFUtils.ToolResults package. See CHANGELOG.md in the repository.</PackageReleaseNotes>
     <IsAotCompatible>true</IsAotCompatible>
     <!-- Fail packing on unintended breaking changes to the published public API. -->
     <EnablePackageValidation>true</EnablePackageValidation>
-    <PackageValidationBaselineVersion>0.5.1</PackageValidationBaselineVersion>
+    <PackageValidationBaselineVersion>0.6.0</PackageValidationBaselineVersion>
   </PropertyGroup>
 
   <ItemGroup>

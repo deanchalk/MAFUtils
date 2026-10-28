@@ -5,7 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <Description>Session-scoped SQL Server metadata catalogs and dependency graph tools for Microsoft Agent Framework and .NET applications.</Description>
-    <Version>0.6.0</Version>
+    <Version>0.7.0</Version>
     <IsPackable>true</IsPackable>
     <PackageId>MAFUtils.SqlServer</PackageId>
     <Authors>Dean Chalk</Authors>
@@ -22,14 +22,14 @@
     <DebugType>portable</DebugType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
-    <PackageReleaseNotes>Dependency graph fixes, built-in schema filtering, an agent refresh opt-out and support for reflection-free JSON. See CHANGELOG.md in the repository for compatibility notes.</PackageReleaseNotes>
+    <PackageReleaseNotes>No changes since 0.6.0; released alongside the new MAFUtils.ToolResults package. See CHANGELOG.md in the repository.</PackageReleaseNotes>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageTags>MicrosoftAgentFramework;AI;SqlServer;Tools</PackageTags>
     <IsAotCompatible>true</IsAotCompatible>
     <!-- Fail packing on unintended breaking changes to the published public API. -->
     <EnablePackageValidation>true</EnablePackageValidation>
-    <PackageValidationBaselineVersion>0.5.1</PackageValidationBaselineVersion>
+    <PackageValidationBaselineVersion>0.6.0</PackageValidationBaselineVersion>
   </PropertyGroup>
 
   <ItemGroup>

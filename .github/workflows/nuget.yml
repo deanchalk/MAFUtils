@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Optional version for both packages, e.g. 0.5.0-rc.1; blank uses each project version'
+        description: 'Optional version for all packages, e.g. 0.5.0-rc.1; blank uses each project version'
         type: string
         required: false
 
@@ -33,7 +33,7 @@ jobs:
         run: |
           sqllocaldb start MSSQLLocalDB
           if ($LASTEXITCODE -ne 0) { throw 'SQL Server LocalDB failed to start.' }
-      - name: Test, pack, inspect and consume both packages
+      - name: Test, pack, inspect and consume all packages
         id: packages
         shell: pwsh
         env:
@@ -82,7 +82,7 @@ jobs:
         id: login
         with:
           user: ${{ secrets.NUGET_USER }}
-      - name: Publish both validated packages and symbols
+      - name: Publish all validated packages and symbols
         shell: pwsh
         env:
           NUGET_API_KEY: ${{ steps.login.outputs.NUGET_API_KEY }}
@@ -90,8 +90,9 @@ jobs:
           $version = $env:GITHUB_REF_NAME.Substring(1)
           $packages = @(Get-ChildItem packages -Recurse -Filter '*.nupkg')
           $symbols = @(Get-ChildItem packages -Recurse -Filter '*.snupkg')
-          if ($packages.Count -ne 2 -or $symbols.Count -ne 2) { throw 'Expected exactly two validated packages and symbol packages.' }
-          $release = foreach ($id in @('MAFUtils.SqlServer', 'MAFUtils.Tools')) {
+          $ids = @('MAFUtils.SqlServer', 'MAFUtils.Tools', 'MAFUtils.ToolResults')
+          if ($packages.Count -ne $ids.Count -or $symbols.Count -ne $ids.Count) { throw 'Expected exactly one validated package and symbol package per package ID.' }
+          $release = foreach ($id in $ids) {
             $match = @($packages | Where-Object Name -CEQ "$id.$version.nupkg")
             if ($match.Count -ne 1) { throw "Missing or mismatched package: $id $version" }
             if (-not (Test-Path -LiteralPath (Join-Path $match[0].DirectoryName "$id.$version.snupkg"))) {
