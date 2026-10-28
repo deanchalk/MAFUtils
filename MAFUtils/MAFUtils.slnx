@@ -2,7 +2,6 @@
   <Folder Name="/Solution Items/">
     <File Path="local.runsettings" />
   </Folder>
-  <Project Path="MAFUtils.Core/MAFUtils.Core.csproj" />
   <Project Path="MAFUtils.SqlServer.Tests/MAFUtils.SqlServer.Tests.csproj" />
   <Project Path="MAFUtils.SqlServer/MAFUtils.SqlServer.csproj" />
   <Project Path="MAFUtils.Tools/MAFUtils.Tools.csproj" Id="1913f561-aecb-4462-862e-fb354401a342" />
