@@ -1,7 +1,7 @@
 # Publishing MAFUtils packages
 
 A pushed version tag releases **MAFUtils.SqlServer** and **MAFUtils.Tools** together, using the tag's version for
-both packages. They remain independently installable NuGet packages. Core and the test projects are not packaged.
+both packages. They remain independently installable NuGet packages. The test projects are not packaged.
 For example, `v0.5.0` produces version `0.5.0` of both libraries; `v0.5.0-rc.1` produces two prerelease packages.
 Branch pushes, pull requests and manual workflow runs validate only; they do not publish.
 
@@ -20,7 +20,12 @@ The script restores/builds the solution, runs each package's test project into a
 requires all tests to pass without skips. It then builds both packages and symbol packages, checks their identities,
 versions, MIT license expressions, README contents and website/repository links, and runs a separate consumer of
 each actual NuGet package. Consumers use separate fresh package caches and cannot resolve MAFUtils packages from
-nuget.org. The SQL consumer never connects to a database; the Tools consumer verifies inspection without invocation.
+nuget.org. They run with reflection-based System.Text.Json disabled, as Native AOT and .NET 10 file-based apps do.
+The SQL consumer never connects to a database; the Tools consumer verifies inspection without invocation.
+
+Packing also runs package validation against the `PackageValidationBaselineVersion` set in each project (currently
+0.5.1, downloaded from nuget.org), so an accidental public API break fails the build. After publishing a release,
+raise the baseline in both projects to that version.
 
 Each run creates `artifacts/nuget/<run-id>` containing:
 

@@ -1,6 +1,6 @@
+using System.Buffers;
 using System.Globalization;
 using System.Text;
-using System.Text.Json;
 
 namespace MAFUtils.Tools;
 
@@ -93,5 +93,31 @@ public sealed class ToolInspectionReport
         return text.ToString();
     }
 
-    private static string Safe(string value) => JsonSerializer.Serialize(value.Length <= 160 ? value : value[..160] + "…");
+    // Hand-written quoting needs no reflection-based JSON and keeps non-ASCII names readable. Control and invisible
+    // formatting characters (including bidirectional overrides and tag characters) and unpaired surrogates are escaped.
+    private static string Safe(string value)
+    {
+        const int maximum = 160;
+        int length = value.Length <= maximum ? value.Length
+            : char.IsHighSurrogate(value[maximum - 1]) && char.IsLowSurrogate(value[maximum]) ? maximum - 1 : maximum;
+        var text = new StringBuilder(length + 3).Append('"');
+        for (var rest = value.AsSpan(0, length); !rest.IsEmpty;)
+        {
+            if (Rune.DecodeFromUtf16(rest, out var rune, out int consumed) != OperationStatus.Done)
+            {
+                text.Append(CultureInfo.InvariantCulture, $"\\u{(int)rest[0]:X4}");
+                consumed = 1;
+            }
+            else if (rune.Value is '"' or '\\')
+                text.Append('\\').Append((char)rune.Value);
+            else if (Rune.GetUnicodeCategory(rune) is UnicodeCategory.Control or UnicodeCategory.Format
+                or UnicodeCategory.LineSeparator or UnicodeCategory.ParagraphSeparator)
+                foreach (char unit in rest[..consumed]) text.Append(CultureInfo.InvariantCulture, $"\\u{(int)unit:X4}");
+            else
+                text.Append(rest[..consumed]);
+            rest = rest[consumed..];
+        }
+        if (length < value.Length) text.Append('…');
+        return text.Append('"').ToString();
+    }
 }

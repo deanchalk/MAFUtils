@@ -13,6 +13,7 @@ public sealed partial class SqlServerMetadataService
     private readonly SemaphoreSlim loadGate = new(1, 1);
     private DatabaseCatalog? catalog;
     public bool DefinitionsEnabled => options.IncludeDefinitions;
+    internal bool AgentRefreshEnabled => options.AllowAgentRefresh;
 
     public SqlServerMetadataService(string connectionString, SqlServerDiscoveryOptions? options = null)
         : this(CreateFactory(connectionString), options) { }
@@ -141,32 +142,40 @@ public sealed partial class SqlServerMetadataService
     private async Task<TableMetadata> DescribeTabularAsync(string schema, string name, SqlObjectKind kind, CancellationToken ct)
     {
         var item = await DescribeObjectAsync(schema, name, ct);
-        if (item.Object.Kind != kind) throw new KeyNotFoundException();
+        if (item.Object.Kind != kind) throw KindMismatch(kind);
         return new(Bounded(item.Object), Section(item.Columns.Select(c => c with { Description = Bounded(c.Description) }).ToArray()),
             Section(item.IndexColumns), Section(item.Relationships));
     }
     private async Task<RoutineMetadata> DescribeRoutineAsync(string schema, string name, SqlObjectKind kind, CancellationToken ct)
     {
         var item = await DescribeObjectAsync(schema, name, ct);
-        if (item.Object.Kind != kind) throw new KeyNotFoundException();
+        if (item.Object.Kind != kind) throw KindMismatch(kind);
         return new(Bounded(item.Object), Section(item.Parameters), Section(item.Columns.Select(c => c with { Description = Bounded(c.Description) }).ToArray()));
     }
     public async Task<ObjectDefinition> GetObjectDefinitionAsync(string schema, string name, CancellationToken cancellationToken = default)
     {
         if (!DefinitionsEnabled) throw new InvalidOperationException("SQL definition access is disabled by the host.");
         var item = await DescribeObjectAsync(schema, name, cancellationToken);
-        var text = item.Definition.Definition;
-        return item.Definition with { Definition = text is null ? null : new(text.Value[..Math.Min(text.Value.Length, options.MaxDefinitionLength)], text.Value.Length > options.MaxDefinitionLength) };
+        return item.Definition with { Definition = Truncate(item.Definition.Definition, options.MaxDefinitionLength) };
     }
 
+    private static KeyNotFoundException KindMismatch(SqlObjectKind kind)
+        => new($"Object unavailable as a {kind} in this snapshot. Use DescribeObjectAsync for any object kind.");
     private DatabaseObject Bounded(DatabaseObject value) => value with { Description = Bounded(value.Description) };
-    private MetadataText? Bounded(MetadataText? value) => value is null ? null : new(value.Value[..Math.Min(value.Value.Length, options.MaxTextLength)], value.Value.Length > options.MaxTextLength);
+    private MetadataText? Bounded(MetadataText? value) => Truncate(value, options.MaxTextLength);
+    private static MetadataText? Truncate(MetadataText? value, int maximum)
+        => value is null ? null : new(value.Value[..TextBoundary(value.Value, Math.Min(value.Value.Length, maximum))], value.Value.Length > maximum);
+    /// <summary>Moves a cut point back one character rather than split a UTF-16 surrogate pair, which JSON
+    /// serialization would otherwise turn into U+FFFD replacement characters.</summary>
+    internal static int TextBoundary(string text, int end)
+        => end > 0 && end < text.Length && char.IsHighSurrogate(text[end - 1]) && char.IsLowSurrogate(text[end]) ? end - 1 : end;
     private MetadataSection<T> Section<T>(IReadOnlyList<T> rows) => new(Array.AsReadOnly(rows.Take(options.MaxDetailRows).ToArray()), rows.Count > options.MaxDetailRows);
     private int PageSize(int offset, int? pageSize)
     {
         var size = pageSize ?? Math.Min(50, options.MaxPageSize);
         DatabaseCatalog.ValidatePage(offset, size);
-        if (size > options.MaxPageSize || offset > int.MaxValue - options.MaxPageSize) throw new ArgumentOutOfRangeException(nameof(pageSize));
+        if (size > options.MaxPageSize) throw new ArgumentOutOfRangeException(nameof(pageSize));
+        if (offset > int.MaxValue - options.MaxPageSize) throw new ArgumentOutOfRangeException(nameof(offset));
         return size;
     }
     private static void ValidateSearch(string? search)

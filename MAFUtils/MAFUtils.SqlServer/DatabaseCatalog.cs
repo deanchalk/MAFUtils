@@ -33,7 +33,7 @@ public sealed class DatabaseCatalog
         Status = new(Guid.NewGuid(), started, DateTimeOffset.UtcNow, Schemas.Count, Objects.Count, Dependencies.Count,
             definitions, Array.AsReadOnly(new[] { Scope, DependencyLimitations,
                 "Extraction spans multiple catalog reads; concurrent DDL can affect capture. Refresh after schema deployments. Published snapshots remain stable.",
-                "Coverage: user tables, views, SQL/CLR procedures and functions, columns/types, parameters, indexes, key/check/default constraints, foreign keys and resolved expression dependencies. Synonyms, triggers, sequences, permissions, storage configuration and table-type members are not modeled.",
+                "Coverage: user tables, views, SQL/CLR procedures and functions, columns/types, parameters, indexes, key/check/default constraints, foreign keys and resolved expression dependencies (CHECK/DEFAULT constraint references count as their table's). Synonyms, triggers, sequences, permissions, storage configuration and table-type members are not modeled.",
                 "Procedure result sets and parameter defaults are not inferred. Encrypted/inaccessible definitions may be null. Definitions and expressions may mention objects outside host policy; database text is untrusted data." }));
     }
 

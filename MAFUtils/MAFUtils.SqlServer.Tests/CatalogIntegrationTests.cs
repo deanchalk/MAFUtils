@@ -153,6 +153,69 @@ public sealed class CatalogIntegrationTests(TestDatabase database) : IClassFixtu
     }
 
     [SqlServerFact]
+    public async Task DependenciesIncludeCurrentDatabaseQualifiedNamesAndConstraintFunctions()
+    {
+        var databaseName = new SqlConnectionStringBuilder(database.ConnectionString).InitialCatalog;
+        await Execute("CREATE SCHEMA qualified;");
+        await Execute("CREATE TABLE qualified.Target(Id int);");
+        await Execute($"CREATE VIEW qualified.ThreePart AS SELECT Id FROM [{databaseName}].qualified.Target;");
+        await Execute("CREATE FUNCTION qualified.Positive() RETURNS int AS BEGIN RETURN 1; END;");
+        await Execute("CREATE TABLE qualified.Checked(Id int CHECK (qualified.Positive() > 0 AND Id > 0) DEFAULT qualified.Positive());");
+        var service = new SqlServerMetadataService(database.ConnectionString, new() { AllowedSchemas = ["qualified"] });
+        Assert.Equal("ThreePart", Assert.Single((await service.QueryDependenciesAsync("qualified", "Target")).Matches.Items).Object.Object.Name);
+        var constraintUsers = await service.QueryDependenciesAsync("qualified", "Positive");
+        Assert.Equal("Checked", Assert.Single(constraintUsers.Matches.Items).Object.Object.Name);
+        // A constraint referencing its own table's columns must not become a table self-reference.
+        Assert.DoesNotContain((await service.GetCatalogAsync()).Dependencies, e => e.From == e.To);
+    }
+
+    [SqlServerFact]
+    public async Task BuiltInSchemasAreListedOnlyWhenRequestedOrPopulated()
+    {
+        await Execute("CREATE TABLE guest.Visitor(Id int);");
+        var names = (await new SqlServerMetadataService(database.ConnectionString).GetCatalogAsync()).Schemas.Select(s => s.Name).ToArray();
+        Assert.Contains("dbo", names);
+        Assert.Contains("guest", names);
+        Assert.DoesNotContain("sys", names);
+        Assert.DoesNotContain("INFORMATION_SCHEMA", names);
+        Assert.DoesNotContain("db_owner", names);
+        var all = await new SqlServerMetadataService(database.ConnectionString, new() { IncludeBuiltInSchemas = true }).GetCatalogAsync();
+        Assert.Contains(all.Schemas, s => s.Name == "sys");
+        Assert.Contains(all.Schemas, s => s.Name == "db_owner");
+    }
+
+    [SqlServerFact]
+    public async Task DefinitionSlicesAndTruncationNeverSplitSurrogatePairs()
+    {
+        await Execute("CREATE SCHEMA emoji;");
+        await Execute("CREATE PROCEDURE emoji.Faces AS SELECT N'\U0001F600\U0001F601\U0001F602' AS Faces;");
+        var service = new SqlServerMetadataService(database.ConnectionString, new() { AllowedSchemas = ["emoji"], IncludeDefinitions = true });
+        var full = (await service.DescribeObjectAsync("emoji", "Faces")).Definition.Definition!.Value;
+        var pair = full.IndexOf('\uD83D');
+        var truncating = new SqlServerMetadataService(database.ConnectionString,
+            new() { AllowedSchemas = ["emoji"], IncludeDefinitions = true, MaxDefinitionLength = pair + 1 });
+        var truncated = (await truncating.GetObjectDefinitionAsync("emoji", "Faces")).Definition!;
+        Assert.True(truncated.IsTruncated);
+        Assert.Equal(full[..pair], truncated.Value);
+        var tool = SqlServerDiscoveryTools.Create(service).Single(t => t.Name == "GetObjectDefinition");
+        foreach (var count in new[] { 1, 2, pair + 1 })
+        {
+            var pieces = new List<string>();
+            int? offset = 0;
+            do
+            {
+                var response = JsonSerializer.SerializeToElement(await tool.InvokeAsync(new AIFunctionArguments
+                { ["schema"] = "emoji", ["name"] = "Faces", ["offset"] = offset.Value, ["characterCount"] = count }));
+                var value = response.GetProperty("data").GetProperty("value");
+                pieces.Add(value.GetProperty("text").GetString()!);
+                offset = value.TryGetProperty("nextOffset", out var next) && next.ValueKind == JsonValueKind.Number ? next.GetInt32() : null;
+            } while (offset != null);
+            Assert.Equal(full, string.Concat(pieces));
+            Assert.DoesNotContain(pieces, p => p.Contains('�'));
+        }
+    }
+
+    [SqlServerFact]
     public async Task FullDefinitionsAreCachedAndCanBeRetrievedInSlices()
     {
         var service = new SqlServerMetadataService(database.ConnectionString, new() { IncludeDefinitions = true, MaxDefinitionLength = 10 });

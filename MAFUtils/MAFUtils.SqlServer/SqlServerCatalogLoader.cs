@@ -21,7 +21,8 @@ public sealed partial class SqlServerMetadataService
             WHERE o.is_ms_shipped=0 AND o.type IN ('U','V','P','PC','FN','IF','TF','FS','FT') AND {policy};
             CREATE UNIQUE CLUSTERED INDEX IX_catalog_objects ON #catalog_objects(object_id);
 
-            SELECT name FROM sys.schemas ORDER BY name;
+            SELECT name,CONVERT(bit,CASE WHEN schema_id IN (2,3,4) OR schema_id BETWEEN 16384 AND 16393 THEN 1 ELSE 0 END)
+            FROM sys.schemas ORDER BY name;
 
             SELECT o.object_id,o.schema_name,o.name,o.type,CONVERT(nvarchar(max),ep.value)
             FROM #catalog_objects o LEFT JOIN sys.extended_properties ep ON ep.class=1 AND ep.major_id=o.object_id
@@ -71,21 +72,26 @@ public sealed partial class SqlServerMetadataService
             SELECT k.parent_object_id,k.name,k.type_desc,NULL,NULL,CONVERT(bit,0),CONVERT(bit,0)
             FROM sys.key_constraints k JOIN #catalog_objects o ON o.object_id=k.parent_object_id;
 
-            SELECT DISTINCT d.referencing_id,d.referenced_id
+            -- CHECK/DEFAULT constraints are separate referencing objects: attribute them to their table.
+            -- Names qualified with the current database still resolve to local objects.
+            SELECT DISTINCT src.object_id,dst.object_id
             FROM sys.sql_expression_dependencies d
-            JOIN #catalog_objects src ON src.object_id=d.referencing_id
+            JOIN sys.objects r ON r.object_id=d.referencing_id
+            JOIN #catalog_objects src ON src.object_id=CASE WHEN r.type IN ('C','D') THEN r.parent_object_id ELSE d.referencing_id END
             JOIN #catalog_objects dst ON dst.object_id=d.referenced_id
             WHERE d.referencing_class=1 AND d.referenced_class=1 AND d.is_caller_dependent=0
-                AND d.referenced_server_name IS NULL AND d.referenced_database_name IS NULL;
+                AND NOT (r.type IN ('C','D') AND r.parent_object_id=d.referenced_id)
+                AND d.referenced_server_name IS NULL
+                AND (d.referenced_database_name IS NULL OR d.referenced_database_name=DB_NAME());
 
             {(DefinitionsEnabled ? "SELECT m.object_id,m.definition FROM sys.sql_modules m JOIN #catalog_objects o ON o.object_id=m.object_id;" : "SELECT CAST(NULL AS int),CAST(NULL AS nvarchar(max)) WHERE 1=0;")}
             DROP TABLE #catalog_objects;
             """;
         await using var reader = await command.ExecuteReaderAsync(ct);
-        var schemas = new List<DatabaseSchema>();
+        var schemas = new List<(DatabaseSchema Schema, bool BuiltIn)>();
         var items = new Dictionary<int, DetailBuilder>();
         var edges = new List<DependencyEdge>();
-        while (await reader.ReadAsync(ct)) schemas.Add(new(reader.GetString(0)));
+        while (await reader.ReadAsync(ct)) schemas.Add((new(reader.GetString(0)), reader.GetBoolean(1)));
         await Next();
         while (await reader.ReadAsync(ct))
         {
@@ -126,8 +132,9 @@ public sealed partial class SqlServerMetadataService
         // Consume completion so late SQL errors cannot publish a seemingly successful snapshot.
         while (await reader.NextResultAsync(ct)) while (await reader.ReadAsync(ct)) { }
         var schemaSet = items.Values.Select(x => x.Object.Object.Schema).ToHashSet(StringComparer.Ordinal);
-        var permittedSchemas = schemas.Where(s => (allowedSchemas is null || allowedSchemas.Length == 0 || allowedSchemas.Contains(s.Name, StringComparer.Ordinal))
-            && (allowedObjects is null || schemaSet.Contains(s.Name)));
+        var permittedSchemas = schemas.Where(s => (options.IncludeBuiltInSchemas || !s.BuiltIn || schemaSet.Contains(s.Schema.Name))
+            && (allowedSchemas is null || allowedSchemas.Length == 0 || allowedSchemas.Contains(s.Schema.Name, StringComparer.Ordinal))
+            && (allowedObjects is null || schemaSet.Contains(s.Schema.Name))).Select(s => s.Schema);
         return new(permittedSchemas, items.Values.Select(x => x.Build()), edges, started, DefinitionsEnabled);
 
         async Task Next()

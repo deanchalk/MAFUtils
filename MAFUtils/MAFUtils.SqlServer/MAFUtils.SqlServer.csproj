@@ -5,7 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <Description>Session-scoped SQL Server metadata catalogs and dependency graph tools for Microsoft Agent Framework and .NET applications.</Description>
-    <Version>0.4.0</Version>
+    <Version>0.6.0</Version>
     <IsPackable>true</IsPackable>
     <PackageId>MAFUtils.SqlServer</PackageId>
     <Authors>Dean Chalk</Authors>
@@ -22,17 +22,21 @@
     <DebugType>portable</DebugType>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
-    <PackageReleaseNotes>Session-scoped metadata snapshots and dependency graph queries. See CHANGELOG.md in the repository for compatibility notes and known issues.</PackageReleaseNotes>
+    <PackageReleaseNotes>Dependency graph fixes, built-in schema filtering, an agent refresh opt-out and support for reflection-free JSON. See CHANGELOG.md in the repository for compatibility notes.</PackageReleaseNotes>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageTags>MicrosoftAgentFramework;AI;SqlServer;Tools</PackageTags>
+    <IsAotCompatible>true</IsAotCompatible>
+    <!-- Fail packing on unintended breaking changes to the published public API. -->
+    <EnablePackageValidation>true</EnablePackageValidation>
+    <PackageValidationBaselineVersion>0.5.1</PackageValidationBaselineVersion>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Data.SqlClient" Version="7.1.1" />
-    <PackageReference Include="Microsoft.Extensions.AI" Version="10.10.0" />
-    <!-- Override SqlClient's transitive version for the October 2026 security fixes. -->
-    <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.13" />
+    <PackageReference Include="Microsoft.Extensions.AI.Abstractions" Version="10.11.0" />
+    <!-- Override SqlClient's transitive version for the October 2026 security fixes. Remove once SqlClient's own dependency is at least this version. -->
+    <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.14" />
     <None Update="README.md" Pack="true" PackagePath="/" />
   </ItemGroup>
 

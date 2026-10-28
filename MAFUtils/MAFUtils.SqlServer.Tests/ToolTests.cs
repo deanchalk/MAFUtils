@@ -39,6 +39,17 @@ public sealed class ToolTests
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => service.ListReferencingObjectsAsync("dbo", "Test", offset: -1));
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => service.ListReferencingObjectsAsync("dbo", "Test", pageSize: 101));
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => service.ListReferencingObjectsAsync("dbo", "Test", kind: (SqlObjectKind)999));
+        Assert.Equal("offset", (await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => service.ListSchemasAsync(offset: int.MaxValue))).ParamName);
+        Assert.Equal("pageSize", (await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => service.ListSchemasAsync(pageSize: 101))).ParamName);
+    }
+
+    [Fact]
+    public void AgentRefreshCanBeLeftToTheHost()
+    {
+        var tools = SqlServerDiscoveryTools.Create(NoConnection(new() { AllowAgentRefresh = false, IncludeDefinitions = true }));
+        Assert.Equal(6, tools.Count);
+        Assert.DoesNotContain(tools, t => t.Name == "RefreshCatalog");
+        Assert.Contains(tools, t => t.Name == "GetObjectDefinition");
     }
 
     [Fact]

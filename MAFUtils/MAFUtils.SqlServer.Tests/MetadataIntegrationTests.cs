@@ -109,14 +109,15 @@ public sealed class MetadataIntegrationTests(TestDatabase database) : IClassFixt
     private SqlServerMetadataService Service(SqlServerDiscoveryOptions? options = null) => new(database.ConnectionString, options);
 
     [SqlServerFact]
-    public async Task SchemasIncludeEmptyAndBuiltInSchemasWithLiteralSearchAndPaging()
+    public async Task SchemasIncludeEmptyUserSchemasWithLiteralSearchAndPaging()
     {
         var service = Service();
         var all = await service.ListSchemasAsync();
         Assert.Contains(all.Items, s => s.Name == "Empty%_");
         Assert.Contains(all.Items, s => s.Name == "sales");
         Assert.Contains(all.Items, s => s.Name == "dbo");
-        Assert.Contains(all.Items, s => s.Name == "sys");
+        Assert.DoesNotContain(all.Items, s => s.Name == "sys");
+        Assert.Contains((await Service(new() { IncludeBuiltInSchemas = true }).ListSchemasAsync(pageSize: 100)).Items, s => s.Name == "sys");
         Assert.Equal("Empty%_", Assert.Single((await service.ListSchemasAsync(search: "%_")).Items).Name);
         Assert.Empty((await service.ListSchemasAsync(search: "' OR 1=1 --")).Items);
         var items = new List<DatabaseSchema>();

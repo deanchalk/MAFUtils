@@ -32,7 +32,7 @@ From your .NET 10 application directory:
 dotnet add package MAFUtils.Tools
 ```
 
-The library references `Microsoft.Extensions.AI.Abstractions` 10.10.0, which NuGet installs as a dependency.
+The library references `Microsoft.Extensions.AI.Abstractions` 10.11.0, which NuGet installs as a dependency.
 
 ## Quick start: inspect function tools
 
@@ -243,9 +243,12 @@ Schema analysis: complete for supported shapes
 ```
 
 Use diagnostic codes, severities and locations for automated assertions rather than matching human-readable
-sentences. `ToText()` uses deterministic LF line endings, escapes names and locations, and truncates each of those
-fields after 160 characters. It does not print tool descriptions, schemas or exception messages. Structured
-diagnostics retain full names and locations. The inspector does not log or write to the console itself.
+sentences. `ToText()` uses deterministic LF line endings and prints names and locations as quoted strings, truncated
+after 160 characters without splitting a surrogate pair. Non-ASCII text such as `Café` stays readable; quotes and
+backslashes are backslash-escaped, and control characters, invisible formatting characters (such as bidirectional
+overrides) and unpaired surrogates are printed as `\uXXXX` escapes, so names cannot alter terminal or log output.
+It does not print tool descriptions, schemas or exception messages. Structured diagnostics retain full names and
+locations. The inspector does not log or write to the console itself.
 
 The structured report also provides remedies that are not included in the compact text output:
 
@@ -468,9 +471,12 @@ the schema budgets do not impose execution timeouts on them.
 
 ## Compatibility
 
-The package targets .NET 10 and references `Microsoft.Extensions.AI.Abstractions` 10.10.0. That combination has
+The package targets .NET 10 and references `Microsoft.Extensions.AI.Abstractions` 10.11.0. That combination has
 been exercised by offline tests covering factory-generated functions, declaration-only functions and custom tool metadata.
 Other version combinations are not claimed as tested.
+
+Inspection and `ToText()` do not use reflection-based System.Text.Json, so they also work in trimmed applications
+and .NET 10 file-based apps (`dotnet run app.cs`), where reflection-based serialization is disabled by default.
 
 ## Troubleshooting findings
 

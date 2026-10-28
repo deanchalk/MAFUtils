@@ -32,8 +32,7 @@ The package supplies the database tools; your application supplies the model con
 Set `SQLSERVER_CONNECTION_STRING` in your application's environment. The SQL identity must be able to read the
 required metadata, including database `VIEW DEFINITION` and `SELECT` on `sys.sql_expression_dependencies`.
 See [Captured metadata and visibility](#captured-metadata-and-visibility) for scope and permission details.
-Review the [release notes and known issues](https://github.com/deanchalk/MAFUtils/blob/main/CHANGELOG.md)
-when evaluating dependency results.
+Review the [release notes](https://github.com/deanchalk/MAFUtils/blob/main/CHANGELOG.md) when upgrading.
 
 ## Quick start: give your agent database tools
 
@@ -106,7 +105,7 @@ A refresh discards the old snapshot's cached dependency traversals once no refer
 | `DescribeObject` | Complete captured columns, parameters, indexes, constraints, expressions and incoming/outgoing foreign keys for one table/view/routine. Module text is separate. |
 | `QueryDependencies` | Direct/transitive incoming/outgoing references, exact total count within the known graph, optional shortest paths and paged matches. |
 | `GetCatalogStatus` | Snapshot ID, capture interval, object/edge counts and coverage limitations. |
-| `RefreshCatalog` | Explicit reload; not needed between ordinary questions. |
+| `RefreshCatalog` | Explicit reload; not needed between ordinary questions. Omitted when `AllowAgentRefresh` is false. |
 | `GetObjectDefinition` | Only registered when definitions are enabled. Character slices over fully cached module text, with continuation. |
 
 Tools return `DiscoveryToolResult<T>` with `Data`, or `ErrorCode`/`Error`. Errors are not empty results. SQL exception
@@ -119,12 +118,17 @@ For huge databases, render inventories directly as grids/downloads or narrow the
 `IsComplete` means complete within the snapshot's stated visibility scope, not proof of unrestricted database access.
 A host rendering `DatabaseInventory.Schemas` directly does not depend on the model reproducing every row faithfully.
 
+The tools carry their own source-generated JSON metadata, so they also work where reflection-based System.Text.Json
+serialization is disabled, such as trimmed applications and .NET 10 file-based apps (`dotnet run app.cs`).
+
 ### Definitions, paging and refresh
 
 `IncludeDefinitions = true` captures available SQL module text and adds `GetObjectDefinition` to the registered
 tools. Its arguments include `schema`, `name`, `offset` and `characterCount` (default 16,000, maximum 100,000).
 The response supplies `Text`, `TotalCharacters`, `NextOffset` and `Availability`; follow `NextOffset` for additional
 slices. Null text means unavailable, such as an encrypted module or an object without a SQL module definition.
+Slices never split a UTF-16 surrogate pair (for example an emoji): a slice ending inside one stops a character early,
+and a one-character slice starting at one returns the whole pair. Always continue from the returned `NextOffset`.
 
 Search and dependency tools return pages with `Items`, `HasMore` and `NextOffset`. The agent should follow the
 continuation when it needs more results. For complete schema/table inventories, use `GetDatabaseInventory`, which
@@ -168,6 +172,8 @@ control the catalog and responses available through that tool collection. Omitte
 | `MaxTextLength` | `2_000` | Maximum description length in bounded detail responses, 1–16,000 characters. |
 | `MaxDefinitionLength` | `16_000` | Maximum text length returned by `GetObjectDefinitionAsync`, 1–100,000 characters. |
 | `IncludeDefinitions` | `false` | Capture complete available module text and expose the definition agent tool. |
+| `IncludeBuiltInSchemas` | `false` | Also list empty built-in schemas (`guest`, `INFORMATION_SCHEMA`, `sys`, `db_owner` and other fixed role schemas). |
+| `AllowAgentRefresh` | `true` | Register the `RefreshCatalog` agent tool. Set false so only your application can reload metadata. |
 | `AllowedSchemas` | `null` | Null or empty permits all visible schemas; otherwise restrict to exact schema names. |
 | `AllowedObjects` | `null` | Null permits all visible objects; an empty collection permits none; otherwise restrict to exact schema/name pairs. |
 
@@ -220,7 +226,8 @@ truncate the underlying catalog. Supported metadata includes:
 - Columns, SQL types, nullability, identity/computed flags, computed/default expressions and descriptions.
 - Routine parameters, scalar return metadata, table-valued function columns.
 - Indexes, index columns, primary/unique keys, filters, check/default constraints and foreign-key column pairs.
-- Resolved expression dependencies between supported objects.
+- Resolved expression dependencies between supported objects, including names qualified with the current database.
+  Functions referenced from CHECK/DEFAULT constraints count as dependencies of the constraint's table.
 - Complete available SQL module definitions when `IncludeDefinitions` is enabled.
 
 This is a structural discovery catalog, not a full database backup or DDL scripting engine. Synonyms, triggers,
@@ -234,6 +241,10 @@ objects appear. Active policies intersect and are copied on construction. They u
 of SQL collation, with a combined limit of 500 configured names (each object counts as two).
 Lookups use exact names returned by the catalog; name substring search is ordinal case-insensitive and treats `%`/`_`
 literally. The in-memory matching semantics do not follow database collation.
+
+Built-in schemas (`guest`, `INFORMATION_SCHEMA`, `sys` and the fixed database-role schemas such as `db_owner`) are
+listed only when they contain captured objects, unless `IncludeBuiltInSchemas` is true. `dbo` is always listed.
+The allow lists still apply to built-in schemas.
 
 SQL identity permissions still determine visibility. Complete dependency extraction requires database `VIEW DEFINITION`
 and `SELECT` on `sys.sql_expression_dependencies`, even when module text is disabled. Missing catalog permissions may
@@ -426,6 +437,14 @@ for example an encrypted module or an object without a SQL module definition. Fo
 `(await metadata.DescribeObjectAsync(schema, name)).Definition` on a service with definitions enabled.
 The agent definition tool instead returns slices using `offset`, `characterCount` (default 16,000, maximum 100,000)
 and `NextOffset`. Follow that continuation to retrieve the remaining text.
+
+## Compatibility with 0.5.x
+
+Empty built-in schemas no longer appear in schema lists or inventories; set `IncludeBuiltInSchemas = true` to restore
+them. Dependency counts can increase because current-database-qualified references and CHECK/DEFAULT constraint
+function references are now captured. Existing APIs, tool names, arguments and result shapes are unchanged.
+The package now depends on `Microsoft.Extensions.AI.Abstractions` rather than `Microsoft.Extensions.AI`; add a direct
+reference to `Microsoft.Extensions.AI` if your application used it only through this package.
 
 ## Compatibility with 0.3.x
 

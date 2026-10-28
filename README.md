@@ -22,10 +22,10 @@ Pushing a release tag publishes both packages with the same tagged version after
 - `MAFUtils/MAFUtils.SqlServer.Tests`: SQL Server unit and integration tests.
 - `MAFUtils/MAFUtils.Tools`: contract inspection library and package documentation.
 - `MAFUtils/MAFUtils.Tools.Tests`: offline inspector tests and SQL tool contract consumer tests.
-- `MAFUtils/MAFUtils.Core`: non-packable placeholder for future shared utilities.
 - `MAFUtils/MAFUtils.slnx`: solution containing the libraries and tests.
 - `scripts/Build-Package.ps1`: release validation and separate consumer smoke tests for both packages.
 - `.github/workflows/nuget.yml`: Windows validation and tag-triggered publication of both packages.
+- `.github/dependabot.yml`: monthly updates for the commit-SHA-pinned GitHub Actions.
 - `global.json`: SDK selection, starting at .NET SDK 10.0.100 and rolling forward to the latest installed feature band.
 - `artifacts`: local package and validation output; generated files are not source.
 
@@ -50,8 +50,13 @@ limits. Unsupported constructs and exhausted configured budgets mark partial ana
 formatting are iterative so unrestricted depth does not consume the call stack.
 
 The Tools test project references both libraries to check real function contracts offline. This is a test dependency,
-not a dependency between the distributed packages. `MAFUtils.Core` currently supplies no shared runtime API and is
-not packable. Add shared abstractions only when independently useful packages actually need them.
+not a dependency between the distributed packages. Add a shared library only when independently useful packages
+actually need common abstractions.
+
+Both libraries set `IsAotCompatible` and must not rely on reflection-based System.Text.Json. `SqlServerDiscoveryTools`
+appends a source-generated context (`SqlServerJsonContext`) after the Microsoft.Extensions.AI default resolver: add
+every new tool parameter or result type to that context. Both projects enable package validation against the
+published 0.5.1 baseline; update `PackageValidationBaselineVersion` after each release.
 
 ## Development prerequisites
 
@@ -123,8 +128,9 @@ uses each project's own default version. See [CHANGELOG.md](CHANGELOG.md) for re
 
 The current NuGet workflow runs on main-branch pushes, pull requests, manual dispatch and `v*` tags. Validation
 starts LocalDB and calls `scripts/Build-Package.ps1`, which builds the solution, runs both test projects with separate
-TRX results, rejects skips/failures, packs both libraries and symbols, checks package metadata and project README
-contents, and runs each package in a separate fresh consumer/cache. Publishing runs only for matching pushed version tags,
+TRX results, rejects skips/failures, packs both libraries and symbols (validating their public API against the
+baseline release), checks package metadata and project README contents, and runs each package in a separate fresh
+consumer/cache with reflection-based JSON disabled. Publishing runs only for matching pushed version tags,
 after validation, using the configured NuGet environment and trusted publishing credentials. Ordinary package builds
 and branch validation do not publish.
 

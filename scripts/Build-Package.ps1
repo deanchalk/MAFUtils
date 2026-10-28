@@ -72,21 +72,28 @@ try {
             if ("lib/net10.0/$id.pdb" -notin $zip.Entries.FullName) { throw "$id portable symbols are missing." }
         } finally { $zip.Dispose() }
         # Consume each package separately so a sibling cannot hide missing declared dependencies.
+        # Reflection-based JSON is disabled, as in Native AOT, trimmed and .NET 10 file-based apps.
         $consumer = Join-Path $validation "consumer-$id"
         New-Item -ItemType Directory $consumer | Out-Null
         @"
 <Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net10.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings></PropertyGroup>
+  <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net10.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings><JsonSerializerIsReflectionEnabledByDefault>false</JsonSerializerIsReflectionEnabledByDefault></PropertyGroup>
   <ItemGroup><PackageReference Include="$id" Version="[$packageVersion]" /></ItemGroup>
 </Project>
 "@ | Set-Content -LiteralPath (Join-Path $consumer 'Consumer.csproj')
         $program = if ($id -eq 'MAFUtils.SqlServer') {
             @'
 using MAFUtils.SqlServer;
+using Microsoft.Extensions.AI;
 var service = new SqlServerMetadataService(() => throw new InvalidOperationException("Must not connect."));
-var names = SqlServerDiscoveryTools.Create(service).Select(t => t.Name).ToArray();
+var tools = SqlServerDiscoveryTools.Create(service);
+var names = tools.Select(t => t.Name).ToArray();
 if (!names.Contains("GetDatabaseInventory") || !names.Contains("QueryDependencies"))
     throw new InvalidOperationException("Expected public tools are missing.");
+// Binds an enum argument and serializes a structured result; validation fails before any connection.
+var result = await tools.Single(t => t.Name == "ListDatabaseObjects").InvokeAsync(new() { ["schema"] = "", ["kind"] = "Table" });
+if (result?.ToString()?.Contains("invalid_argument") != true)
+    throw new InvalidOperationException("Structured tool result was not produced.");
 Console.WriteLine("SQL Server package consumer passed.");
 '@
         } else {
@@ -95,7 +102,7 @@ using MAFUtils.Tools;
 using Microsoft.Extensions.AI;
 var function = AIFunctionFactory.Create((Func<string>)(() => throw new InvalidOperationException("Must not invoke.")), "Lookup", "Look up an item.");
 var report = ToolContractInspector.Inspect([function, function], new ToolInspectionOptions { MaxSchemaDepth = null });
-if (!report.HasErrors || report.Diagnostics.Count(d => d.Code == "MFT002") != 1)
+if (!report.HasErrors || report.Diagnostics.Count(d => d.Code == "MFT002") != 1 || !report.ToText().Contains("MFT002"))
     throw new InvalidOperationException("Contract inspection failed.");
 Console.WriteLine("Tools package consumer passed.");
 '@

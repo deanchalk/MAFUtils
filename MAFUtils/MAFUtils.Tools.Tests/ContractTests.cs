@@ -192,6 +192,21 @@ public sealed class ContractTests
     }
 
     [Fact]
+    public void TextKeepsReadableNamesButEscapesInvisibleCharactersAndNeverSplitsSurrogates()
+    {
+        var text = ToolContractInspector.Inspect([
+            Function(name: "Café \"q\" \\"),
+            Function(name: "a‮b\U000E0041"),
+            Function(name: new string('a', 159) + "\U0001F600"),
+            Function(name: "x\uD800")]).ToText();
+        Assert.Contains("\"Café \\\"q\\\" \\\\\"", text);
+        Assert.Contains("\"a\\u202Eb\\uDB40\\uDC41\"", text);
+        Assert.Contains("\"" + new string('a', 159) + "…\"", text);
+        Assert.Contains("\"x\\uD800\"", text);
+        Assert.DoesNotContain('�', text);
+    }
+
+    [Fact]
     public void TextReportHasStableCountsAndStatus()
     {
         var report = ToolContractInspector.Inspect([new Hosted("Lookup", ""), new Hosted("Lookup", "Good description")]);
